@@ -12,9 +12,45 @@ import { api } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import type { DashboardStats } from "@/types";
 
+type SystemEvent = {
+  id: string;
+  level: string;
+  source: string;
+  message: string;
+  event_metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type SystemEventListResponse = {
+  items: SystemEvent[];
+  total: number;
+  skip: number;
+  limit: number;
+};
+
+function relativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function eventIcon(source: string): string {
+  if (source.includes("collect")) return "🔍";
+  if (source.includes("send") || source.includes("message")) return "✉️";
+  if (source.includes("sync")) return "🔄";
+  return "ℹ️";
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [activity, setActivity] = useState<SystemEvent[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -24,6 +60,12 @@ export default function DashboardPage() {
     api.get<DashboardStats>("/api/v1/stats/dashboard")
       .then(setStats)
       .catch(() => {});
+
+    setActivityLoading(true);
+    api.get<SystemEventListResponse>("/api/v1/logs/system?limit=10")
+      .then((data) => setActivity(data.items))
+      .catch(() => {})
+      .finally(() => setActivityLoading(false));
   }, [router]);
 
   const statCards = [
@@ -32,18 +74,21 @@ export default function DashboardPage() {
       value: stats?.total_jobs ?? "—",
       icon: Briefcase,
       description: `${stats?.active_jobs ?? "—"} active`,
+      href: "/jobs",
     },
     {
       title: "Applications",
       value: stats?.total_applications ?? "—",
       icon: Activity,
       description: `${stats?.pending_approvals ?? "—"} pending approval`,
+      href: "/applications",
     },
     {
       title: "Pending Approvals",
       value: stats?.pending_approvals ?? "—",
       icon: CheckSquare,
       description: "Awaiting your review",
+      href: "/approvals",
     },
   ];
 
@@ -58,16 +103,18 @@ export default function DashboardPage() {
             {statCards.map((stat) => {
               const Icon = stat.icon;
               return (
-                <Card key={stat.title}>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                    <p className="text-xs text-muted-foreground">{stat.description}</p>
-                  </CardContent>
-                </Card>
+                <Link key={stat.title} href={stat.href} className="block hover:no-underline">
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stat.value}</div>
+                      <p className="text-xs text-muted-foreground">{stat.description}</p>
+                    </CardContent>
+                  </Card>
+                </Link>
               );
             })}
           </div>
@@ -112,6 +159,38 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activityLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : activity.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No activity yet — start by collecting jobs.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {activity.map((event) => (
+                    <li key={event.id} className="flex items-start gap-3">
+                      <span className="text-lg leading-none mt-0.5" aria-hidden>
+                        {eventIcon(event.source)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{event.message}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {event.source} · {relativeTime(event.created_at)}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
 
         </main>
       </div>

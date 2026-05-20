@@ -36,6 +36,8 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.prod
+docker-compose.prod.override.yml
 
 # Docker
 *.pem
@@ -53,6 +55,8 @@ uploads/
 # Logs
 *.log
 logs/
+!frontend/src/app/logs/
+!frontend/src/app/**/logs/
 
 # Database
 *.db

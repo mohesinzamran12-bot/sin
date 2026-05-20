@@ -9,6 +9,7 @@ from app.core.security import get_current_user
 from app.models.application import Application
 from app.models.job import Job
 from app.models.score import AIAuditLog
+from app.models.system import SystemEvent
 from app.schemas.score import AIAuditLogListResponse, AIAuditLogRead
 
 router = APIRouter()
@@ -43,6 +44,44 @@ async def list_ai_logs(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get("/logs/system")
+async def list_system_events(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    source: str | None = Query(default=None),
+    level: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+    _: dict = Depends(get_current_user),
+) -> dict:
+    query = select(SystemEvent)
+    count_query = select(func.count()).select_from(SystemEvent)
+    if source:
+        query = query.where(SystemEvent.source == source)
+        count_query = count_query.where(SystemEvent.source == source)
+    if level:
+        query = query.where(SystemEvent.level == level)
+        count_query = count_query.where(SystemEvent.level == level)
+    total = (await session.execute(count_query)).scalar_one()
+    query = query.order_by(SystemEvent.created_at.desc()).offset(skip).limit(limit)
+    items = (await session.execute(query)).scalars().all()
+    return {
+        "items": [
+            {
+                "id": str(e.id),
+                "level": e.level,
+                "source": e.source,
+                "message": e.message,
+                "event_metadata": e.event_metadata,
+                "created_at": e.created_at.isoformat(),
+            }
+            for e in items
+        ],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
 
 
 @router.get("/stats/dashboard")

@@ -3,6 +3,9 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.api.v1 import applications, approvals, auth, candidates, collection, conversations, jobs, logs, notifications, scoring, send
 from app.core.config import settings
@@ -17,12 +20,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="Job CRM API",
     version="1.0.0",
     description="AI-powered Job Application CRM",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,4 +55,8 @@ app.include_router(send.router, prefix="/api/v1", tags=["send"])
 
 @app.get("/health", tags=["health"])
 async def health() -> dict:
-    return {"status": "ok", "version": "1.0.0"}
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "phases_complete": 6,
+    }

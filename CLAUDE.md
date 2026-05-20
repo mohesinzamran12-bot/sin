@@ -56,10 +56,39 @@ cd backend && pip install aiosqlite pytest-asyncio httpx && pytest
 |---|---|---|
 | 1 | ✅ Done | Foundation: auth, profiles, jobs CRUD, Docker |
 | 2 | ✅ Done | Claude scoring, AI audit log, application drafts, cost tracking |
-| 3 | Planned | Approval workflow + Telegram notifications |
-| 4 | Planned | Playwright job collection from BOSS Zhipin |
-| 5 | Planned | Message sending + conversation tracking |
-| 6 | Planned | Polish + production hardening |
+| 3 | ✅ Done | Approval workflow + Telegram notifications |
+| 4 | ✅ Done | Playwright job collection from BOSS Zhipin |
+| 5 | ✅ Done | Message sending + conversation tracking |
+| 6 | ✅ Done | Polish + production hardening |
+
+## Production Deployment
+
+```bash
+cp .env.prod.example .env.prod
+# Fill in ALL values — especially generate new secrets:
+# python -c "import secrets; print(secrets.token_hex(32))"
+
+make prod-build
+make prod-up
+docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+```
+
+Access via http://your-server (port 80, proxied by nginx).
+
+To add HTTPS: place SSL certificates at `/etc/nginx/certs/` and update `nginx/nginx.conf` to listen on 443.
+
+## Services
+
+| Service | Dev Port | Purpose |
+|---|---|---|
+| frontend | 3000 | Next.js UI |
+| backend | 8000 | FastAPI REST API |
+| worker | — | Celery general tasks |
+| playwright_worker | — | Browser automation tasks |
+| beat | — | Celery scheduled tasks (prod only) |
+| nginx | 80 | Reverse proxy (prod only) |
+| db | 5432 | PostgreSQL 16 |
+| redis | 6379 | Message broker + cache |
 
 ## Safety Invariants (never remove)
 - All Claude calls logged to `ai_audit_log`
