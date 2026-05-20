@@ -155,3 +155,25 @@ export interface NotificationSettings {
   telegram_configured: boolean;
   telegram_chat_id: string | null;
 }
+
+export interface BrowserSession {
+  id: string;
+  platform: string;
+  is_valid: boolean;
+  user_agent: string;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface CollectionStatus {
+  last_run_at: string | null;
+  last_run_result: {
+    collected: number;
+    new: number;
+    errors: string[];
+    skipped_reason: string | null;
+  } | null;
+  runs_today: number;
+  max_runs_per_day: number;
+  has_valid_session: boolean;
+}

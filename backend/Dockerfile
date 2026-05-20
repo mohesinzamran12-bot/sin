@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install Playwright browsers (chromium only)
+RUN playwright install chromium --with-deps
+
 COPY . .
 
 ENV PYTHONPATH=/app

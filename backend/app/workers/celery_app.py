@@ -21,6 +21,11 @@ celery_app.conf.update(
 # Import tasks to register them with Celery
 celery_app.autodiscover_tasks(["app.workers.tasks"])
 
+celery_app.conf.task_routes = {
+    "tasks.collect_jobs": {"queue": "playwright"},
+    "tasks.*": {"queue": "celery"},
+}
+
 celery_app.conf.beat_schedule = {
     "expire-old-approvals": {
         "task": "tasks.expire_old_approvals",

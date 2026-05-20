@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { JobCard } from "@/components/job-card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { api } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
-import type { Job, JobListResponse } from "@/types";
+import type { Job, JobListResponse, Candidate, CollectionStatus } from "@/types";
 
 export default function JobsPage() {
   const router = useRouter();
@@ -40,13 +41,27 @@ export default function JobsPage() {
   const [formDescription, setFormDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Collection state
+  const [collectionStatus, setCollectionStatus] = useState<CollectionStatus | null>(null);
+  const [collecting, setCollecting] = useState(false);
+
   useEffect(() => {
     if (!isAuthenticated()) {
       router.replace("/login");
       return;
     }
     fetchJobs();
+    fetchCollectionStatus();
   }, [router, cityFilter, activeOnly, skip]);
+
+  const fetchCollectionStatus = async () => {
+    try {
+      const status = await api.get<CollectionStatus>("/api/v1/collection/status");
+      setCollectionStatus(status);
+    } catch {
+      // silently ignore
+    }
+  };
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -99,12 +114,95 @@ export default function JobsPage() {
     }
   };
 
+  const handleCollect = async () => {
+    setCollecting(true);
+    try {
+      // Get first candidate
+      const candidates = await api.get<{ items: Candidate[]; total: number }>("/api/v1/candidates/");
+      if (!candidates.items || candidates.items.length === 0) {
+        toast.error("No candidate profile found. Create a candidate profile first.");
+        return;
+      }
+      const candidateId = candidates.items[0].id;
+      const result = await api.post<{ task_id: string; status: string; message: string }>(
+        "/api/v1/collection/trigger",
+        { candidate_id: candidateId }
+      );
+      toast.success(`Collection started (task: ${result.task_id})`);
+      await fetchCollectionStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Collection failed");
+    } finally {
+      setCollecting(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Header title="Jobs" />
         <main className="flex-1 p-6 space-y-4">
+          {/* BOSS Zhipin Collection Banner */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Collect from BOSS Zhipin</CardTitle>
+                {collectionStatus && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>
+                      {collectionStatus.runs_today}/{collectionStatus.max_runs_per_day} runs today
+                    </span>
+                    {collectionStatus.has_valid_session ? (
+                      <Badge variant="default" className="text-xs">Session OK</Badge>
+                    ) : (
+                      <Badge variant="destructive" className="text-xs">No session</Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {collectionStatus && !collectionStatus.has_valid_session ? (
+                <p className="text-sm text-amber-600">
+                  No BOSS session configured. Go to{" "}
+                  <button
+                    className="underline font-medium"
+                    onClick={() => router.push("/settings")}
+                  >
+                    Settings
+                  </button>{" "}
+                  to add your cookies.
+                </p>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <Button
+                    onClick={handleCollect}
+                    disabled={
+                      collecting ||
+                      !collectionStatus?.has_valid_session ||
+                      (collectionStatus?.runs_today ?? 0) >= (collectionStatus?.max_runs_per_day ?? 4)
+                    }
+                    size="sm"
+                  >
+                    {collecting ? "Collecting..." : "Collect Jobs"}
+                  </Button>
+                  {collectionStatus?.last_run_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Last run: {new Date(collectionStatus.last_run_at).toLocaleString()}
+                      {collectionStatus.last_run_result && (
+                        <span>
+                          {" "}— {collectionStatus.last_run_result.collected} collected,{" "}
+                          {collectionStatus.last_run_result.new} new
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Filters + Add button */}
           <div className="flex items-end gap-4 flex-wrap">
             <div className="space-y-1">
