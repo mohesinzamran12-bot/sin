@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { Plus, Search, RefreshCw } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { JobCard } from "@/components/job-card";
-import { isAuthenticated } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { api } from "@/lib/api-client";
+import { isAuthenticated } from "@/lib/auth";
 import type { Job, JobListResponse } from "@/types";
 
 export default function JobsPage() {
@@ -21,70 +26,78 @@ export default function JobsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [cityFilter, setCityFilter] = useState("");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [activeOnly, setActiveOnly] = useState(true);
+  const [skip, setSkip] = useState(0);
+  const limit = 20;
 
-  // Add job form
-  const [newTitle, setNewTitle] = useState("");
-  const [newCompany, setNewCompany] = useState("");
-  const [newCity, setNewCity] = useState("");
-  const [newSalary, setNewSalary] = useState("");
-  const [newUrl, setNewUrl] = useState("");
-  const [adding, setAdding] = useState(false);
+  // Add job form state
+  const [showForm, setShowForm] = useState(false);
+  const [formTitle, setFormTitle] = useState("");
+  const [formCompany, setFormCompany] = useState("");
+  const [formCity, setFormCity] = useState("");
+  const [formSalary, setFormSalary] = useState("");
+  const [formUrl, setFormUrl] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
     fetchJobs();
-  }, [router]);
+  }, [router, cityFilter, activeOnly, skip]);
 
-  async function fetchJobs(city?: string) {
+  const fetchJobs = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ is_active: "true", limit: "50" });
-      if (city) params.append("city", city);
-      const res = await api.get<JobListResponse>(`/api/v1/jobs/?${params}`);
-      setJobs(res.items);
-      setTotal(res.total);
+      const params = new URLSearchParams({
+        skip: skip.toString(),
+        limit: limit.toString(),
+      });
+      if (activeOnly) params.set("is_active", "true");
+      if (cityFilter) params.set("city", cityFilter);
+
+      const data = await api.get<JobListResponse>(
+        `/api/v1/jobs/?${params.toString()}`
+      );
+      setJobs(data.items);
+      setTotal(data.total);
     } catch (err) {
-      toast.error("Failed to load jobs");
+      toast.error(err instanceof Error ? err.message : "Failed to fetch jobs");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  function handleSearch(e: React.FormEvent) {
+  const handleAddJob = async (e: React.FormEvent) => {
     e.preventDefault();
-    fetchJobs(cityFilter || undefined);
-  }
-
-  async function handleAddJob(e: React.FormEvent) {
-    e.preventDefault();
-    setAdding(true);
+    setSubmitting(true);
     try {
-      const job = await api.post<Job>("/api/v1/jobs/", {
-        title: newTitle,
-        company_name: newCompany,
-        city: newCity || null,
-        salary_range: newSalary || null,
-        url: newUrl || null,
+      const newJob = await api.post<Job>("/api/v1/jobs/", {
+        title: formTitle,
+        company_name: formCompany,
+        city: formCity || null,
+        salary_range: formSalary || null,
+        url: formUrl || null,
+        description: formDescription || null,
       });
-      setJobs((prev) => [job, ...prev]);
+      setJobs((prev) => [newJob, ...prev]);
       setTotal((t) => t + 1);
-      setNewTitle("");
-      setNewCompany("");
-      setNewCity("");
-      setNewSalary("");
-      setNewUrl("");
-      setShowAddForm(false);
+      setShowForm(false);
+      setFormTitle("");
+      setFormCompany("");
+      setFormCity("");
+      setFormSalary("");
+      setFormUrl("");
+      setFormDescription("");
       toast.success("Job added");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add job");
     } finally {
-      setAdding(false);
+      setSubmitting(false);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -92,86 +105,113 @@ export default function JobsPage() {
       <div className="flex-1 flex flex-col">
         <Header title="Jobs" />
         <main className="flex-1 p-6 space-y-4">
-
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{total} jobs found</p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => fetchJobs(cityFilter || undefined)}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-              <Button size="sm" onClick={() => setShowAddForm((v) => !v)}>
+          {/* Filters + Add button */}
+          <div className="flex items-end gap-4 flex-wrap">
+            <div className="space-y-1">
+              <Label htmlFor="city-filter">Filter by City</Label>
+              <Input
+                id="city-filter"
+                value={cityFilter}
+                onChange={(e) => {
+                  setCityFilter(e.target.value);
+                  setSkip(0);
+                }}
+                placeholder="Shanghai, Beijing..."
+                className="w-48"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer pb-1">
+              <input
+                type="checkbox"
+                checked={activeOnly}
+                onChange={(e) => {
+                  setActiveOnly(e.target.checked);
+                  setSkip(0);
+                }}
+              />
+              <span className="text-sm">Active only</span>
+            </label>
+            <div className="ml-auto">
+              <Button onClick={() => setShowForm(!showForm)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Job
               </Button>
             </div>
           </div>
 
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <Input
-              placeholder="Filter by city…"
-              value={cityFilter}
-              onChange={(e) => setCityFilter(e.target.value)}
-              className="max-w-xs"
-            />
-            <Button type="submit" variant="outline" size="sm">
-              <Search className="h-4 w-4" />
-            </Button>
-          </form>
-
-          {showAddForm && (
+          {/* Add job form */}
+          {showForm && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Add Job Manually</CardTitle>
+                <CardTitle className="text-base">Add New Job</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleAddJob} className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="jTitle">Job Title *</Label>
-                    <Input
-                      id="jTitle"
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
-                      required
-                    />
+                <form onSubmit={handleAddJob} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="job-title">Job Title *</Label>
+                      <Input
+                        id="job-title"
+                        value={formTitle}
+                        onChange={(e) => setFormTitle(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="job-company">Company *</Label>
+                      <Input
+                        id="job-company"
+                        value={formCompany}
+                        onChange={(e) => setFormCompany(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="job-city">City</Label>
+                      <Input
+                        id="job-city"
+                        value={formCity}
+                        onChange={(e) => setFormCity(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="job-salary">Salary Range</Label>
+                      <Input
+                        id="job-salary"
+                        value={formSalary}
+                        onChange={(e) => setFormSalary(e.target.value)}
+                        placeholder="20k-30k"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="job-url">URL</Label>
+                      <Input
+                        id="job-url"
+                        value={formUrl}
+                        onChange={(e) => setFormUrl(e.target.value)}
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="job-desc">Description</Label>
+                      <textarea
+                        id="job-desc"
+                        value={formDescription}
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="Job description..."
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="jCompany">Company *</Label>
-                    <Input
-                      id="jCompany"
-                      value={newCompany}
-                      onChange={(e) => setNewCompany(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="jCity">City</Label>
-                    <Input id="jCity" value={newCity} onChange={(e) => setNewCity(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="jSalary">Salary Range</Label>
-                    <Input
-                      id="jSalary"
-                      value={newSalary}
-                      onChange={(e) => setNewSalary(e.target.value)}
-                      placeholder="20k-30k"
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="jUrl">Job URL</Label>
-                    <Input
-                      id="jUrl"
-                      type="url"
-                      value={newUrl}
-                      onChange={(e) => setNewUrl(e.target.value)}
-                      placeholder="https://…"
-                    />
-                  </div>
-                  <div className="col-span-2 flex gap-2">
-                    <Button type="submit" disabled={adding}>
-                      {adding ? "Adding…" : "Add Job"}
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={submitting}>
+                      {submitting ? "Adding..." : "Add Job"}
                     </Button>
-                    <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowForm(false)}
+                    >
                       Cancel
                     </Button>
                   </div>
@@ -180,12 +220,22 @@ export default function JobsPage() {
             </Card>
           )}
 
+          {/* Stats */}
+          <p className="text-sm text-muted-foreground">
+            {total} job{total !== 1 ? "s" : ""} found
+          </p>
+
+          {/* Job grid */}
           {loading ? (
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <p className="text-muted-foreground">Loading...</p>
           ) : jobs.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              No jobs yet. Add one manually or wait for the collector to run.
-            </div>
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">
+                  No jobs found. Add your first job using the button above.
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {jobs.map((job) => (
@@ -198,6 +248,30 @@ export default function JobsPage() {
             </div>
           )}
 
+          {/* Pagination */}
+          {total > limit && (
+            <div className="flex gap-2 justify-center pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={skip === 0}
+                onClick={() => setSkip(Math.max(0, skip - limit))}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground self-center">
+                Page {Math.floor(skip / limit) + 1} of {Math.ceil(total / limit)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={skip + limit >= total}
+                onClick={() => setSkip(skip + limit)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </main>
       </div>
     </div>
