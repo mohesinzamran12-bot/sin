@@ -13,5 +13,5 @@ class SystemEvent(SQLModel, table=True):
     level: str
     source: str
     message: str = Field(sa_column=Column(Text, nullable=False))
-    metadata: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
+    event_metadata: Optional[dict] = Field(default=None, sa_column=Column("metadata", JSON, nullable=True))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

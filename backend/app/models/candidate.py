@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import ARRAY, Column, String
+from sqlalchemy import Column, String
 from sqlmodel import JSON, Field, SQLModel
 
 
@@ -25,23 +25,24 @@ class JobPreferences(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     candidate_id: uuid.UUID = Field(foreign_key="candidates.id")
+    # Using JSON columns for cross-DB compatibility (works on both PostgreSQL and SQLite)
     target_titles: list[str] = Field(
         default_factory=list,
-        sa_column=Column(ARRAY(String), nullable=True, default=[]),
+        sa_column=Column(JSON, nullable=True),
     )
     target_cities: list[str] = Field(
         default_factory=list,
-        sa_column=Column(ARRAY(String), nullable=True, default=[]),
+        sa_column=Column(JSON, nullable=True),
     )
     min_salary: Optional[int] = None
     max_salary: Optional[int] = None
     excluded_companies: list[str] = Field(
         default_factory=list,
-        sa_column=Column(ARRAY(String), nullable=True, default=[]),
+        sa_column=Column(JSON, nullable=True),
     )
     preferred_industries: list[str] = Field(
         default_factory=list,
-        sa_column=Column(ARRAY(String), nullable=True, default=[]),
+        sa_column=Column(JSON, nullable=True),
     )
     remote_ok: bool = False
     full_time_only: bool = True
