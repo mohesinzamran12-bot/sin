@@ -5,5 +5,6 @@ from app.models.score import JobScore, AIAuditLog
 from app.models.application import Application
 from app.models.approval import ApprovalQueue
 from app.models.browser import BrowserSession
+from app.models.conversation import Conversation
 
-__all__ = ["Candidate", "JobPreferences", "Job", "SystemEvent", "JobScore", "AIAuditLog", "Application", "ApprovalQueue", "BrowserSession"]
+__all__ = ["Candidate", "JobPreferences", "Job", "SystemEvent", "JobScore", "AIAuditLog", "Application", "ApprovalQueue", "BrowserSession", "Conversation"]

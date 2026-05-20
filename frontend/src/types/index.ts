@@ -177,3 +177,23 @@ export interface CollectionStatus {
   max_runs_per_day: number;
   has_valid_session: boolean;
 }
+
+export interface Conversation {
+  id: string;
+  application_id: string;
+  direction: "inbound" | "outbound";
+  body: string;
+  sender_name: string;
+  sent_at: string;
+  reply_needed: boolean;
+  reply_deadline: string | null;
+  draft_reply: string | null;
+  collected_at: string;
+}
+
+export interface ConversationListResponse {
+  items: Conversation[];
+  total: number;
+  skip: number;
+  limit: number;
+}

@@ -23,6 +23,8 @@ celery_app.autodiscover_tasks(["app.workers.tasks"])
 
 celery_app.conf.task_routes = {
     "tasks.collect_jobs": {"queue": "playwright"},
+    "tasks.send_application_message": {"queue": "playwright"},
+    "tasks.sync_conversations": {"queue": "playwright"},
     "tasks.*": {"queue": "celery"},
 }
 

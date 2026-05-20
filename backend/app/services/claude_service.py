@@ -295,3 +295,82 @@ Write only the message, no preamble."""
     )
 
     return draft
+
+
+async def classify_and_draft_reply(
+    message: str,
+    job_title: str,
+    session: AsyncSession,
+    application,  # Application model instance
+) -> tuple[bool, str | None]:
+    """
+    Classify an inbound BOSS message: does it need a reply?
+    If yes, draft a brief reply in Chinese.
+    Returns (reply_needed: bool, draft_reply: str | None).
+    Logs to ai_audit_log.
+    """
+    import anthropic
+
+    api_key = _require_api_key()
+
+    # Check budget (estimate 400 input + 200 output)
+    _check_budget(_estimate_cost(400, 200))
+
+    prompt = (
+        f"A recruiter sent this message on BOSS Zhipin:\n\n"
+        f"\"{message}\"\n\n"
+        f"Context: This is regarding a job application for a position as {job_title}.\n\n"
+        f"Tasks:\n"
+        f"1. Does this message require a reply? (e.g. they asked a question, invited for interview, requested info — yes; generic acknowledgment — no)\n"
+        f"2. If yes, write a brief professional reply in Chinese (2-3 sentences max).\n\n"
+        f"Use the classify_reply tool."
+    )
+
+    tool = {
+        "name": "classify_reply",
+        "description": "Classify if a recruiter message needs a reply and draft one if so",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reply_needed": {"type": "boolean"},
+                "reason": {"type": "string", "description": "Brief explanation"},
+                "draft_reply": {"type": "string", "description": "Reply in Chinese, or empty string if not needed"},
+            },
+            "required": ["reply_needed", "reason"],
+        },
+    }
+
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    response = await client.messages.create(
+        model=settings.CLAUDE_MODEL,
+        max_tokens=512,
+        tools=[tool],
+        tool_choice={"type": "tool", "name": "classify_reply"},
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    input_tokens = response.usage.input_tokens
+    output_tokens = response.usage.output_tokens
+    _record_spend(input_tokens, output_tokens)
+
+    result: dict = {"reply_needed": False, "draft_reply": None}
+    for block in response.content:
+        if block.type == "tool_use" and block.name == "classify_reply":
+            result["reply_needed"] = block.input.get("reply_needed", False)
+            draft = block.input.get("draft_reply") or None
+            result["draft_reply"] = draft if draft and draft.strip() else None
+
+    # Audit log
+    await _log_ai_call(
+        session=session,
+        event_type="classify",
+        entity_type="conversation",
+        entity_id=application.id,
+        model=settings.CLAUDE_MODEL,
+        prompt=prompt,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        result_summary=f"reply_needed={result['reply_needed']}",
+    )
+
+    return result["reply_needed"], result["draft_reply"]

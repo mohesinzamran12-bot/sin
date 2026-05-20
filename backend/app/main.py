@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import applications, approvals, auth, candidates, collection, jobs, logs, notifications, scoring
+from app.api.v1 import applications, approvals, auth, candidates, collection, conversations, jobs, logs, notifications, scoring, send
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.logging import configure_logging
@@ -41,6 +41,8 @@ app.include_router(logs.router, prefix="/api/v1", tags=["logs"])
 app.include_router(approvals.router, prefix="/api/v1/approvals", tags=["approvals"])
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(collection.router, prefix="/api/v1/collection", tags=["collection"])
+app.include_router(conversations.router, prefix="/api/v1/conversations", tags=["conversations"])
+app.include_router(send.router, prefix="/api/v1", tags=["send"])
 
 
 @app.get("/health", tags=["health"])

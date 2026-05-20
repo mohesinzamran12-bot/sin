@@ -85,7 +85,7 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-border">
-        <p className="text-xs text-muted-foreground">Phase 3</p>
+        <p className="text-xs text-muted-foreground">Phase 5</p>
       </div>
     </aside>
   );

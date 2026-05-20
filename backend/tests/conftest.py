@@ -23,6 +23,7 @@ async def setup_db():
     # Import models to register them
     from app.models import candidate, job, system, score, application, approval  # noqa: F401
     from app.models.browser import BrowserSession  # noqa: F401
+    from app.models.conversation import Conversation  # noqa: F401
 
     async with test_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
