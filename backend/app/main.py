@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import applications, auth, candidates, jobs, logs, scoring
+from app.api.v1 import applications, approvals, auth, candidates, jobs, logs, notifications, scoring
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.logging import configure_logging
@@ -38,6 +38,8 @@ app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["jobs"])
 app.include_router(scoring.router, prefix="/api/v1", tags=["scoring"])
 app.include_router(applications.router, prefix="/api/v1/applications", tags=["applications"])
 app.include_router(logs.router, prefix="/api/v1", tags=["logs"])
+app.include_router(approvals.router, prefix="/api/v1/approvals", tags=["approvals"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["notifications"])
 
 
 @app.get("/health", tags=["health"])

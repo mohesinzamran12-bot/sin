@@ -127,3 +127,31 @@ export interface AIAuditLogListResponse {
   skip: number;
   limit: number;
 }
+
+export interface ApprovalQueue {
+  id: string;
+  application_id: string;
+  action: string;
+  payload: {
+    message: string;
+    job_title: string;
+    company: string;
+    score: number | null;
+  };
+  status: string;
+  reviewer_notes: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+export interface ApprovalQueueListResponse {
+  items: ApprovalQueue[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface NotificationSettings {
+  telegram_configured: boolean;
+  telegram_chat_id: string | null;
+}

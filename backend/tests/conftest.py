@@ -21,7 +21,7 @@ TestSessionLocal = async_sessionmaker(
 async def setup_db():
     """Create tables before each test, drop after."""
     # Import models to register them
-    from app.models import candidate, job, system, score, application  # noqa: F401
+    from app.models import candidate, job, system, score, application, approval  # noqa: F401
 
     async with test_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
@@ -55,3 +55,36 @@ async def client(session: AsyncSession):
 def auth_headers() -> dict:
     token = create_access_token({"sub": "admin@example.com"})
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def mock_claude(monkeypatch):
+    """Mock Claude service so tests run without a real Anthropic API key."""
+    import uuid as _uuid
+    from datetime import datetime, timezone
+    from app.models.score import JobScore
+
+    async def fake_score(job, candidate, session):
+        s = JobScore(
+            job_id=job.id,
+            candidate_id=candidate.id,
+            score=82.5,
+            score_breakdown={"skills": 22, "experience": 20, "salary": 21, "culture": 19.5},
+            match_summary="Strong match for this role.",
+            strengths=["Python expertise", "FastAPI experience"],
+            concerns=["Limited frontend skills"],
+            model_used="claude-sonnet-4-6-mock",
+            prompt_tokens=500,
+            completion_tokens=200,
+        )
+        session.add(s)
+        await session.flush()
+        await session.refresh(s)
+        return s
+
+    async def fake_draft(job, candidate, score, session):
+        return "您好，我对贵公司的职位非常感兴趣，希望有机会进一步交流。"
+
+    import app.services.claude_service as cs
+    monkeypatch.setattr(cs, "score_job_against_cv", fake_score)
+    monkeypatch.setattr(cs, "draft_application_message", fake_draft)

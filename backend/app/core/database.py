@@ -17,6 +17,9 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
 )
 
+# Session factory for use outside FastAPI request context (e.g. Celery tasks)
+async_session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:

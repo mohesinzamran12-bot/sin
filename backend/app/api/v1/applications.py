@@ -78,6 +78,37 @@ async def create_application(
     session.add(application)
     await session.flush()
     await session.refresh(application)
+
+    # Create approval queue entry (mandatory — no application proceeds without it)
+    from app.models.approval import ApprovalQueue
+    score_value = score.score if score else None
+    approval_entry = ApprovalQueue(
+        application_id=application.id,
+        action="send_application",
+        payload={
+            "message": draft or "",
+            "job_title": job.title,
+            "company": job.company_name,
+            "score": score_value,
+        },
+    )
+    session.add(approval_entry)
+    await session.flush()
+    await session.refresh(approval_entry)
+
+    # Enqueue Telegram notification (best-effort, non-blocking)
+    try:
+        from app.workers.tasks.notification_tasks import send_approval_notification
+        send_approval_notification.delay(
+            job_title=job.title,
+            company=job.company_name,
+            score=score_value,
+            draft_message=draft or "",
+            approval_id=str(approval_entry.id),
+        )
+    except Exception:
+        pass  # Worker may not be running in dev; notification is best-effort
+
     return ApplicationRead.model_validate(application)
 
 

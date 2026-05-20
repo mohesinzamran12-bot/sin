@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import settings
 
@@ -16,3 +17,13 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
 )
+
+# Import tasks to register them with Celery
+celery_app.autodiscover_tasks(["app.workers.tasks"])
+
+celery_app.conf.beat_schedule = {
+    "expire-old-approvals": {
+        "task": "tasks.expire_old_approvals",
+        "schedule": crontab(minute="*/30"),  # every 30 minutes
+    },
+}
