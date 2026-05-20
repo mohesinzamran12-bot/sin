@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -14,7 +14,96 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import { formatDate, formatSalary } from "@/lib/utils";
-import type { Job } from "@/types";
+import type { Job, JobScore } from "@/types";
+
+// ── ScoreDisplay component ────────────────────────────────────────────────────
+
+function ScoreDisplay({ score }: { score: JobScore }) {
+  const scoreColor =
+    score.score >= 70
+      ? "text-green-600"
+      : score.score >= 40
+      ? "text-yellow-600"
+      : "text-red-600";
+
+  const breakdownItems = [
+    { label: "Skills", value: score.score_breakdown.skills, max: 25 },
+    { label: "Experience", value: score.score_breakdown.experience, max: 25 },
+    { label: "Salary", value: score.score_breakdown.salary, max: 25 },
+    { label: "Culture / Location", value: score.score_breakdown.culture, max: 25 },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Score number */}
+      <div className="flex items-center gap-3">
+        <span className={`text-5xl font-bold ${scoreColor}`}>
+          {Math.round(score.score)}
+        </span>
+        <span className="text-muted-foreground text-lg">/100</span>
+      </div>
+
+      {/* Breakdown bars */}
+      <div className="space-y-2">
+        {breakdownItems.map(({ label, value, max }) => (
+          <div key={label}>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-muted-foreground">{label}</span>
+              <span className="font-medium">
+                {value}/{max}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${(value / max) * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Summary */}
+      <p className="text-sm text-muted-foreground">{score.match_summary}</p>
+
+      {/* Strengths */}
+      {score.strengths.length > 0 && (
+        <div>
+          <p className="text-sm font-medium mb-1">Strengths</p>
+          <ul className="space-y-1">
+            {score.strengths.map((s, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-green-700">
+                <span className="mt-0.5">+</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Concerns */}
+      {score.concerns.length > 0 && (
+        <div>
+          <p className="text-sm font-medium mb-1">Concerns</p>
+          <ul className="space-y-1">
+            {score.concerns.map((c, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-amber-700">
+                <span className="mt-0.5">!</span>
+                <span>{c}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        Model: {score.model_used} &middot; {score.prompt_tokens + score.completion_tokens} tokens
+      </p>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function JobDetailPage() {
   const router = useRouter();
@@ -25,6 +114,11 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Scoring state
+  const [score, setScore] = useState<JobScore | null>(null);
+  const [scoring, setScoring] = useState(false);
+  const [scoreError, setScoreError] = useState<string | null>(null);
 
   // Edit form
   const [editTitle, setEditTitle] = useState("");
@@ -42,12 +136,55 @@ export default function JobDetailPage() {
     fetchJob();
   }, [router, jobId]);
 
+  const fetchExistingScore = async (candidateId: string) => {
+    try {
+      const data = await api.get<JobScore>(
+        `/api/v1/jobs/${jobId}/score?candidate_id=${candidateId}`
+      );
+      setScore(data);
+    } catch {
+      // 404 is expected if no score exists yet — silently ignore
+    }
+  };
+
+  const handleGetScore = async () => {
+    const candidateId = localStorage.getItem("candidate_id");
+    if (!candidateId) {
+      toast.error("No candidate profile found. Set up your profile first.");
+      return;
+    }
+    setScoring(true);
+    setScoreError(null);
+    try {
+      const data = await api.post<JobScore>(`/api/v1/jobs/${jobId}/score`, {
+        candidate_id: candidateId,
+      });
+      setScore(data);
+      toast.success("Job scored successfully");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Scoring failed";
+      if (msg.includes("503") || msg.toLowerCase().includes("api key")) {
+        setScoreError("AI scoring is not available (API key not configured).");
+      } else {
+        setScoreError(msg);
+        toast.error(msg);
+      }
+    } finally {
+      setScoring(false);
+    }
+  };
+
   const fetchJob = async () => {
     setLoading(true);
     try {
       const data = await api.get<Job>(`/api/v1/jobs/${jobId}`);
       setJob(data);
       populateEdit(data);
+      // Try to load existing score
+      const candidateId = localStorage.getItem("candidate_id");
+      if (candidateId) {
+        await fetchExistingScore(candidateId);
+      }
     } catch {
       toast.error("Job not found");
       router.push("/jobs");
@@ -178,12 +315,40 @@ export default function JobDetailPage() {
                   </div>
                 )}
 
-                {/* Phase 2 placeholder */}
-                <Card className="bg-muted/50">
-                  <CardContent className="py-4">
-                    <p className="text-sm text-muted-foreground">
-                      AI Match Score: <span className="font-medium">Available in Phase 2</span>
-                    </p>
+                {/* AI Match Score */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      AI Match Score
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {score ? (
+                      <ScoreDisplay score={score} />
+                    ) : scoreError ? (
+                      <div className="flex items-start gap-2 text-sm text-amber-700">
+                        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span>{scoreError}</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No score yet. Click below to have Claude evaluate this
+                        job against your profile.
+                      </p>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGetScore}
+                      disabled={scoring}
+                    >
+                      {scoring
+                        ? "Scoring..."
+                        : score
+                        ? "Re-score"
+                        : "Get AI Score"}
+                    </Button>
                   </CardContent>
                 </Card>
 

@@ -55,7 +55,7 @@ cd backend && pip install aiosqlite pytest-asyncio httpx && pytest
 | Phase | Status | Description |
 |---|---|---|
 | 1 | ✅ Done | Foundation: auth, profiles, jobs CRUD, Docker |
-| 2 | Planned | Claude scoring + AI audit log |
+| 2 | ✅ Done | Claude scoring, AI audit log, application drafts, cost tracking |
 | 3 | Planned | Approval workflow + Telegram notifications |
 | 4 | Planned | Playwright job collection from BOSS Zhipin |
 | 5 | Planned | Message sending + conversation tracking |

@@ -21,7 +21,7 @@ TestSessionLocal = async_sessionmaker(
 async def setup_db():
     """Create tables before each test, drop after."""
     # Import models to register them
-    from app.models import candidate, job, system  # noqa: F401
+    from app.models import candidate, job, system, score, application  # noqa: F401
 
     async with test_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)

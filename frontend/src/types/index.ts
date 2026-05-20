@@ -56,3 +56,74 @@ export interface TokenResponse {
 export interface UserInfo {
   email: string;
 }
+
+export interface ScoreBreakdown {
+  skills: number;
+  experience: number;
+  salary: number;
+  culture: number;
+}
+
+export interface JobScore {
+  id: string;
+  job_id: string;
+  candidate_id: string;
+  score: number;
+  score_breakdown: ScoreBreakdown;
+  match_summary: string;
+  strengths: string[];
+  concerns: string[];
+  model_used: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  scored_at: string;
+}
+
+export interface Application {
+  id: string;
+  job_id: string;
+  candidate_id: string;
+  status: string;
+  draft_message: string | null;
+  final_message: string | null;
+  approved_at: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationListResponse {
+  items: Application[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface DashboardStats {
+  total_jobs: number;
+  active_jobs: number;
+  total_applications: number;
+  pending_approvals: number;
+  total_ai_calls: number;
+  total_tokens_today: number;
+  estimated_cost_today_usd: number;
+}
+
+export interface AIAuditLog {
+  id: string;
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  result_summary: string;
+  created_at: string;
+}
+
+export interface AIAuditLogListResponse {
+  items: AIAuditLog[];
+  total: number;
+  skip: number;
+  limit: number;
+}
