@@ -1,0 +1,9 @@
+version: "3.9"
+# Dev overrides: hot reload already handled by volume mounts in main compose
+services:
+  backend:
+    environment:
+      - ENVIRONMENT=development
+  frontend:
+    environment:
+      - NODE_ENV=development
